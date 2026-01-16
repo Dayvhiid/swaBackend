@@ -61,6 +61,9 @@ router.post('/login', async (req, res) => {
         const user = await User.findOne({ email });
 
         if (user && (await user.comparePassword(password))) {
+            if (!user.isValidated) {
+                return res.status(401).json({ message: 'Your account is pending validation by a Super Admin' });
+            }
             res.json({
                 _id: user._id,
                 name: user.name,

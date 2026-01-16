@@ -13,6 +13,11 @@ const protect = async (req, res, next) => {
             if (!req.user) {
                 return res.status(401).json({ message: 'User not found' });
             }
+
+            if (!req.user.isValidated) {
+                return res.status(403).json({ message: 'Your account is pending validation by a Super Admin' });
+            }
+
             next();
         } catch (error) {
             console.error(error);

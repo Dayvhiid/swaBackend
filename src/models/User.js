@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['soul_winner', 'soul-winner', 'parish_admin', 'area_admin', 'zonal_admin', 'super_admin'],
+        enum: ['soul_winner', 'parish_admin', 'area_admin', 'zonal_admin', 'super_admin'],
         default: 'soul_winner'
     },
     parishId: {
@@ -47,9 +47,14 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-userSchema.pre('save', async function () {
-    if (!this.isModified('passwordHash')) return;
-    this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
+userSchema.pre('save', async function (next) {
+    if (!this.isModified('passwordHash')) return next();
+    try {
+        this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
+        next();
+    } catch (error) {
+        next(error);
+    }
 });
 
 // Method to compare passwords

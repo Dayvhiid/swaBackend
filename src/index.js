@@ -39,11 +39,15 @@ mongoose.connect(MONGODB_URI)
     .then(() => console.log('Connected to MongoDB'))
     .catch(err => console.error('Could not connect to MongoDB', err));
 
+// Routes
+app.use('/api/auth', require('./routes/auth'));
 // Routes with stricter rate limiting for auth
 app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/user', require('./routes/notifications'));
 app.use('/api/converts', require('./routes/converts'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Health check
 app.use('/api/health', (req, res) => {

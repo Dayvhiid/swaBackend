@@ -32,7 +32,7 @@ const validateSignup = [
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
     passwordValidation('password'),
     body('role').optional().isIn(VALID_ROLES)
-        .withMessage('Invalid role')
+        .withMessage(`Role must be one of: ${VALID_ROLES.join(', ')}`)
 ];
 
 const validateLogin = [

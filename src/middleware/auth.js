@@ -9,7 +9,7 @@ const protect = async (req, res, next) => {
             token = req.headers.authorization.split(' ')[1];
             
             if (!process.env.JWT_SECRET) {
-                console.error('JWT_SECRET environment variable is not set');
+                console.error('Critical environment variable missing');
                 return res.status(500).json({ message: 'Server configuration error' });
             }
             

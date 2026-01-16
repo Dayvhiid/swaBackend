@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
+// Exported roles enum for single source of truth
+const VALID_ROLES = ['soul_winner', 'parish_admin', 'area_admin', 'zonal_admin', 'super_admin'];
+
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -20,7 +23,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['soul_winner', 'parish_admin', 'area_admin', 'zonal_admin', 'super_admin'],
+        enum: VALID_ROLES,
         default: 'soul_winner'
     },
     parishId: {
@@ -79,4 +82,7 @@ userSchema.methods.getResetPasswordToken = function () {
     return resetToken;
 };
 
-module.exports = mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
+
+module.exports = User;
+module.exports.VALID_ROLES = VALID_ROLES;

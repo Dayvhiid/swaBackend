@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const { VALID_ROLES } = require('../models/User');
 const { protect } = require('../middleware/auth');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
@@ -17,16 +18,20 @@ const generateToken = (id) => {
     });
 };
 
+// Reusable password validation chain
+const passwordValidation = (fieldName = 'password') => 
+    body(fieldName)
+        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+        .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
+        .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+        .matches(/\d/).withMessage('Password must contain at least one number');
+
 // Validation middleware
 const validateSignup = [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
-    body('password')
-        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-        .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
-        .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
-        .matches(/\d/).withMessage('Password must contain at least one number'),
-    body('role').optional().isIn(['soul_winner', 'parish_admin', 'area_admin', 'zonal_admin', 'super_admin'])
+    passwordValidation('password'),
+    body('role').optional().isIn(VALID_ROLES)
         .withMessage('Invalid role')
 ];
 
@@ -37,11 +42,7 @@ const validateLogin = [
 
 const validatePasswordChange = [
     body('currentPassword').notEmpty().withMessage('Current password is required'),
-    body('newPassword')
-        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-        .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
-        .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
-        .matches(/\d/).withMessage('Password must contain at least one number')
+    passwordValidation('newPassword')
 ];
 
 const validateForgotPassword = [
@@ -50,11 +51,7 @@ const validateForgotPassword = [
 
 const validateResetPassword = [
     body('token').notEmpty().withMessage('Token is required'),
-    body('newPassword')
-        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-        .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
-        .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
-        .matches(/\d/).withMessage('Password must contain at least one number')
+    passwordValidation('newPassword')
 ];
 
 // Validation result handler

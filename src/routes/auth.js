@@ -1,6 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const { VALID_ROLES } = require('../models/User');
 const { protect } = require('../middleware/auth');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
@@ -8,15 +10,63 @@ const sendEmail = require('../utils/sendEmail');
 const router = express.Router();
 
 const generateToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
+    if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET environment variable is not set');
+    }
+    return jwt.sign({ id }, process.env.JWT_SECRET, {
         expiresIn: '30d'
     });
+};
+
+// Reusable password validation chain
+const passwordValidation = (fieldName = 'password') => 
+    body(fieldName)
+        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+        .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
+        .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+        .matches(/\d/).withMessage('Password must contain at least one number');
+
+// Validation middleware
+const validateSignup = [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    passwordValidation('password'),
+    body('role').optional().isIn(VALID_ROLES)
+        .withMessage(`Role must be one of: ${VALID_ROLES.join(', ')}`)
+];
+
+const validateLogin = [
+    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('password').notEmpty().withMessage('Password is required')
+];
+
+const validatePasswordChange = [
+    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    passwordValidation('newPassword')
+];
+
+const validateForgotPassword = [
+    body('email').isEmail().normalizeEmail().withMessage('Valid email is required')
+];
+
+const validateResetPassword = [
+    body('token').notEmpty().withMessage('Token is required'),
+    passwordValidation('newPassword')
+];
+
+// Validation result handler
+const handleValidationErrors = (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    next();
 };
 
 // @desc    Register a new user
 // @route   POST /api/auth/signup
 // @access  Public
-router.post('/signup', async (req, res) => {
+router.post('/signup', validateSignup, handleValidationErrors, async (req, res) => {
     try {
         const { name, email, password, role, parishId, areaId, zonalId } = req.body;
 
@@ -54,7 +104,7 @@ router.post('/signup', async (req, res) => {
 // @desc    Authenticate user & get token
 // @route   POST /api/auth/login
 // @access  Public
-router.post('/login', async (req, res) => {
+router.post('/login', validateLogin, handleValidationErrors, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -83,24 +133,28 @@ router.post('/login', async (req, res) => {
 // @route   GET /api/user/profile
 // @access  Private
 router.get('/profile', protect, async (req, res) => {
-    const user = await User.findById(req.user._id);
-    if (user) {
-        res.json({
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            notificationPreferences: user.notificationPreferences
-        });
-    } else {
-        res.status(404).json({ message: 'User not found' });
+    try {
+        const user = await User.findById(req.user._id);
+        if (user) {
+            res.json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                notificationPreferences: user.notificationPreferences
+            });
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 });
 
 // @desc    Change user password
 // @route   POST /api/auth/change-password
 // @access  Private
-router.post('/change-password', protect, async (req, res) => {
+router.post('/change-password', protect, validatePasswordChange, handleValidationErrors, async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const user = await User.findById(req.user._id);
@@ -120,7 +174,7 @@ router.post('/change-password', protect, async (req, res) => {
 // @desc    Forgot Password
 // @route   POST /api/auth/forgot-password
 // @access  Public
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', validateForgotPassword, handleValidationErrors, async (req, res) => {
     try {
         const user = await User.findOne({ email: req.body.email });
 
@@ -168,7 +222,7 @@ router.post('/forgot-password', async (req, res) => {
 // @desc    Reset Password
 // @route   POST /api/auth/reset-password
 // @access  Public
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', validateResetPassword, handleValidationErrors, async (req, res) => {
     try {
         // Get hashed token
         const resetPasswordToken = crypto

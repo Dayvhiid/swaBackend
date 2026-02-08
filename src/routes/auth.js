@@ -58,7 +58,7 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = await User.findOne({ email }).select('_id name email role passwordHash isValidated');
+        const user = await User.findOne({ email });
 
         if (user && (await user.comparePassword(password))) {
             if (!user.isValidated) {
@@ -82,15 +82,19 @@ router.post('/login', async (req, res) => {
 // @desc    Get user profile
 // @route   GET /api/user/profile
 // @access  Private
-router.get('/profile', protect, (req, res) => {
-    // User already fetched by protect middleware - no extra DB call needed
-    res.json({
-        _id: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        role: req.user.role,
-        notificationPreferences: req.user.notificationPreferences
-    });
+router.get('/profile', protect, async (req, res) => {
+    const user = await User.findById(req.user._id);
+    if (user) {
+        res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            notificationPreferences: user.notificationPreferences
+        });
+    } else {
+        res.status(404).json({ message: 'User not found' });
+    }
 });
 
 // @desc    Change user password

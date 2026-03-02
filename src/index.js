@@ -48,6 +48,7 @@ app.use('/api/converts', require('./routes/converts'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/hierarchy', require('./routes/hierarchyRoutes'));
 
 // Health check
 app.use('/api/health', (req, res) => {

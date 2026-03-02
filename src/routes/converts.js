@@ -9,8 +9,8 @@ const router = express.Router();
 // @access  Private
 router.get('/', protect, async (req, res) => {
     try {
-        const pageSize = 10;
-        const page = Number(req.query.pageNumber) || 1;
+        const pageSize = Number(req.query.pageSize) || Number(req.query.limit) || 10;
+        const page = Number(req.query.pageNumber) || Number(req.query.page) || 1;
 
         const keyword = req.query.keyword
             ? {

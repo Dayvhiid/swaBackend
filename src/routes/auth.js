@@ -14,12 +14,12 @@ const generateToken = (id) => {
         throw new Error('JWT_SECRET environment variable is not set');
     }
     return jwt.sign({ id }, process.env.JWT_SECRET, {
-        expiresIn: '30d'
+        expiresIn: '2h'
     });
 };
 
 // Reusable password validation chain
-const passwordValidation = (fieldName = 'password') => 
+const passwordValidation = (fieldName = 'password') =>
     body(fieldName)
         .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
         .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')

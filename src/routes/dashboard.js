@@ -1,15 +1,43 @@
 const express = require('express');
 const Convert = require('../models/Convert');
+const { Zone, Area, Parish } = require('../models/Hierarchy');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
+
+async function buildHierarchyFilter(query) {
+    const { zoneId, areaId, parishId } = query;
+    let filter = {};
+
+    // Clean up potentially stringified "null", "undefined", or empty strings from the frontend
+    const cleanId = (id) => id && id !== 'null' && id !== 'undefined' && id.trim() !== '' ? id : null;
+
+    const pId = cleanId(parishId);
+    const aId = cleanId(areaId);
+    const zId = cleanId(zoneId);
+
+    if (pId) {
+        filter.parishId = pId;
+    } else if (aId) {
+        const parishes = await Parish.find({ areaId: aId }).select('_id');
+        filter.parishId = { $in: parishes.map(p => p._id.toString()) };
+    } else if (zId) {
+        const areas = await Area.find({ zoneId: zId }).select('_id');
+        const areaIds = areas.map(a => a._id.toString());
+        const parishes = await Parish.find({ areaId: { $in: areaIds } }).select('_id');
+        filter.parishId = { $in: parishes.map(p => p._id.toString()) };
+    }
+
+    return filter;
+}
 
 // @desc    Get aggregate stats
 // @route   GET /api/dashboard/stats
 // @access  Private
 router.get('/stats', protect, async (req, res) => {
     try {
-        const filter = {};
+        const hierarchyFilter = await buildHierarchyFilter(req.query);
+        const filter = { ...hierarchyFilter };
         if (req.user.role === 'soul_winner') {
             filter.soulWinnerId = req.user._id;
         }
@@ -50,7 +78,8 @@ router.get('/stats', protect, async (req, res) => {
 // @access  Private
 router.get('/trends', protect, async (req, res) => {
     try {
-        const filter = {};
+        const hierarchyFilter = await buildHierarchyFilter(req.query);
+        const filter = { ...hierarchyFilter };
         if (req.user.role === 'soul_winner') {
             filter.soulWinnerId = req.user._id;
         }
@@ -78,7 +107,9 @@ router.get('/trends', protect, async (req, res) => {
 // @access  Private
 router.get('/pending-followups', protect, async (req, res) => {
     try {
+        const hierarchyFilter = await buildHierarchyFilter(req.query);
         const filter = {
+            ...hierarchyFilter,
             'followUpVisits': {
                 $elemMatch: {
                     visitDate: { $lt: new Date() },

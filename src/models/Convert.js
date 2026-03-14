@@ -18,7 +18,13 @@ const convertSchema = new mongoose.Schema({
     dateBornAgain: { type: Date },
     ageGroup: {
         type: String,
-        enum: ['Children', 'Teenagers', 'YAYA', 'Adults', 'Elders']
+        enum: ['Children', 'Teenagers', 'YAYA', 'Adults', 'Elders'],
+        set: function (v) {
+            if (!v) return v;
+            const val = v.trim();
+            if (val.toLowerCase() === 'yaya') return 'YAYA';
+            return val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+        }
     },
     gender: {
         type: String,
@@ -102,7 +108,7 @@ convertSchema.virtual('stage').get(function () {
     const completedVisits = this.followUpVisits.filter(v => v.isCompleted).length;
 
     if (completedVisits < 8) {
-        return `Visit ${completedVisits + 1} of 8`;
+        return `${completedVisits} of 8`;
     }
 
     if (completedVisits === 8 && this.spiritualGrowth.believerClass !== 'Completed') {

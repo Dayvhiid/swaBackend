@@ -22,9 +22,9 @@ const generateToken = (id) => {
 const passwordValidation = (fieldName = 'password') =>
     body(fieldName)
         .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-        .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
-        .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
-        .matches(/\d/).withMessage('Password must contain at least one number');
+        .matches(/[a-z]/).withMessage('Please add at least one lowercase letter to your password combination')
+        .matches(/[A-Z]/).withMessage('Please add at least one uppercase letter to your password combination')
+        .matches(/\d/).withMessage('Please add at least one number to your password combination');
 
 // Validation middleware
 const validateSignup = [
@@ -72,7 +72,17 @@ router.post('/signup', validateSignup, handleValidationErrors, async (req, res) 
 
         const userExists = await User.findOne({ email });
         if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({
+                errors: [
+                    {
+                        type: 'field',
+                        value: email,
+                        msg: 'User already exists',
+                        path: 'email',
+                        location: 'body'
+                    }
+                ]
+            });
         }
 
         const user = await User.create({
@@ -94,10 +104,25 @@ router.post('/signup', validateSignup, handleValidationErrors, async (req, res) 
                 token: generateToken(user._id)
             });
         } else {
-            res.status(400).json({ message: 'Invalid user data' });
+            res.status(400).json({
+                errors: [
+                    {
+                        type: 'request',
+                        msg: 'Invalid user data',
+                        location: 'body'
+                    }
+                ]
+            });
         }
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({
+            errors: [
+                {
+                    type: 'server',
+                    msg: error.message
+                }
+            ]
+        });
     }
 });
 

@@ -40,7 +40,6 @@ mongoose.connect(MONGODB_URI)
     .catch(err => console.error('Could not connect to MongoDB', err));
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
 // Routes with stricter rate limiting for auth
 app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/user', require('./routes/notifications'));

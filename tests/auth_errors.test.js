@@ -74,4 +74,54 @@ describe('Signup Error Messages', () => {
         expect(res.body.errors[0].type).toBe('server');
         expect(res.body.errors[0].msg).toBe('Database connection failed');
     });
+
+    it('should auto-validate super admin signup accounts', async () => {
+        User.findOne.mockResolvedValue(null);
+        User.create.mockResolvedValue({
+            _id: 'user-id-1',
+            name: 'Super Admin',
+            email: 'superadmin@example.com',
+            role: 'super_admin'
+        });
+
+        const res = await request(app)
+            .post('/api/auth/signup')
+            .send({
+                name: 'Super Admin',
+                email: 'superadmin@example.com',
+                password: 'Password123',
+                role: 'super_admin'
+            });
+
+        expect(res.statusCode).toEqual(201);
+        expect(User.create).toHaveBeenCalledWith(expect.objectContaining({
+            email: 'superadmin@example.com',
+            role: 'super_admin',
+            isValidated: true
+        }));
+    });
+});
+
+describe('Login Error Messages', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('should return pending validation response for valid credentials on unvalidated account', async () => {
+        User.findOne.mockResolvedValue({
+            comparePassword: jest.fn().mockResolvedValue(true),
+            isValidated: false
+        });
+
+        const res = await request(app)
+            .post('/api/auth/login')
+            .send({
+                email: 'pending@example.com',
+                password: 'Password123'
+            });
+
+        expect(res.statusCode).toEqual(403);
+        expect(res.body.code).toBe('ACCOUNT_PENDING_VALIDATION');
+        expect(res.body.message).toBe('Your account is pending validation by a Super Admin');
+    });
 });

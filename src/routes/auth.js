@@ -68,7 +68,9 @@ const handleValidationErrors = (req, res, next) => {
 // @access  Public
 router.post('/signup', validateSignup, handleValidationErrors, async (req, res) => {
     try {
-        const { name, email, password, role, parishId, areaId, zonalId } = req.body;
+        const { name, password, role, parishId, areaId, zonalId } = req.body;
+        const email = req.body.email ? req.body.email.trim().toLowerCase() : '';
+        const isValidated = role === 'super_admin';
 
         const userExists = await User.findOne({ email });
         if (userExists) {
@@ -92,7 +94,8 @@ router.post('/signup', validateSignup, handleValidationErrors, async (req, res) 
             role,
             parishId,
             areaId,
-            zonalId
+            zonalId,
+            isValidated
         });
 
         if (user) {
@@ -131,13 +134,17 @@ router.post('/signup', validateSignup, handleValidationErrors, async (req, res) 
 // @access  Public
 router.post('/login', validateLogin, handleValidationErrors, async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const email = req.body.email ? req.body.email.trim().toLowerCase() : '';
+        const password = req.body.password || '';
 
         const user = await User.findOne({ email });
 
         if (user && (await user.comparePassword(password))) {
             if (!user.isValidated) {
-                return res.status(401).json({ message: 'Your account is pending validation by a Super Admin' });
+                return res.status(403).json({
+                    code: 'ACCOUNT_PENDING_VALIDATION',
+                    message: 'Your account is pending validation by a Super Admin'
+                });
             }
             res.json({
                 _id: user._id,

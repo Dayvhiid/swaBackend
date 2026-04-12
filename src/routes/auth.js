@@ -99,13 +99,19 @@ router.post('/signup', validateSignup, handleValidationErrors, async (req, res) 
         });
 
         if (user) {
-            res.status(201).json({
+            const responseData = {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                token: generateToken(user._id)
-            });
+                isValidated: user.isValidated
+            };
+
+            if (user.isValidated) {
+                responseData.token = generateToken(user._id);
+            }
+
+            res.status(201).json(responseData);
         } else {
             res.status(400).json({
                 errors: [

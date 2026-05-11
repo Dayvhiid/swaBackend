@@ -1,5 +1,6 @@
 const express = require('express');
 const Convert = require('../models/Convert');
+const User = require('../models/User');
 const { Zone, Area, Parish } = require('../models/Hierarchy');
 const { protect } = require('../middleware/auth');
 
@@ -38,8 +39,21 @@ router.get('/stats', protect, async (req, res) => {
     try {
         const hierarchyFilter = await buildHierarchyFilter(req.query);
         const filter = { ...hierarchyFilter };
+        
+        // Apply role-based filtering
         if (req.user.role === 'soul_winner') {
             filter.soulWinnerId = req.user._id;
+        } else if (req.user.role === 'parish_admin') {
+            // Parish admin should only see converts in their parish
+            if (req.user.parishId) {
+                filter.parishId = req.user.parishId;
+            }
+        } else if (req.user.role === 'area_admin') {
+            // Area admin should see converts in any parish within their area
+            if (req.user.areaId && !filter.parishId) {
+                const parishes = await Parish.find({ areaId: req.user.areaId }).select('_id');
+                filter.parishId = { $in: parishes.map(p => p._id.toString()) };
+            }
         }
 
         const totalConverts = await Convert.countDocuments(filter);
@@ -61,12 +75,23 @@ router.get('/stats', protect, async (req, res) => {
         // Simple retention rate calculation (Active / Total)
         const retentionRate = totalConverts > 0 ? (activeConverts / totalConverts) * 100 : 0;
 
+        // For parish admins, include pending soul winners to validate
+        let pendingSoulWinnersCount = 0;
+        if (req.user.role === 'parish_admin') {
+            pendingSoulWinnersCount = await User.countDocuments({
+                role: 'soul_winner',
+                isValidated: false,
+                parishId: req.user.parishId
+            });
+        }
+
         res.json({
             totalConverts,
             activeConverts,
             completedConverts,
             pendingFollowupsCount,
-            retentionRate: retentionRate.toFixed(2)
+            retentionRate: retentionRate.toFixed(2),
+            ...(req.user.role === 'parish_admin' && { pendingSoulWinnersCount })
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -79,9 +104,22 @@ router.get('/stats', protect, async (req, res) => {
 router.get('/trends', protect, async (req, res) => {
     try {
         const hierarchyFilter = await buildHierarchyFilter(req.query);
-        const filter = { ...hierarchyFilter };
+        let filter = { ...hierarchyFilter };
+
+        // Apply role-based filtering
         if (req.user.role === 'soul_winner') {
             filter.soulWinnerId = req.user._id;
+        } else if (req.user.role === 'parish_admin') {
+            // Parish admin should only see trends for their parish
+            if (req.user.parishId) {
+                filter.parishId = req.user.parishId;
+            }
+        } else if (req.user.role === 'area_admin') {
+            // Area admin should see trends for any parish within their area
+            if (req.user.areaId && !filter.parishId) {
+                const parishes = await Parish.find({ areaId: req.user.areaId }).select('_id');
+                filter.parishId = { $in: parishes.map(p => p._id.toString()) };
+            }
         }
 
         // Aggregate converts by month
@@ -108,19 +146,30 @@ router.get('/trends', protect, async (req, res) => {
 router.get('/pending-followups', protect, async (req, res) => {
     try {
         const hierarchyFilter = await buildHierarchyFilter(req.query);
-        const filter = {
-            ...hierarchyFilter,
-            'followUpVisits': {
-                $elemMatch: {
-                    visitDate: { $lt: new Date() },
-                    isCompleted: false
-                }
-            }
-        };
+        let filter = { ...hierarchyFilter };
 
+        // Apply role-based filtering
         if (req.user.role === 'soul_winner') {
             filter.soulWinnerId = req.user._id;
+        } else if (req.user.role === 'parish_admin') {
+            // Parish admin should only see follow-ups in their parish
+            if (req.user.parishId) {
+                filter.parishId = req.user.parishId;
+            }
+        } else if (req.user.role === 'area_admin') {
+            // Area admin should see follow-ups in any parish within their area
+            if (req.user.areaId && !filter.parishId) {
+                const parishes = await Parish.find({ areaId: req.user.areaId }).select('_id');
+                filter.parishId = { $in: parishes.map(p => p._id.toString()) };
+            }
         }
+
+        filter.followUpVisits = {
+            $elemMatch: {
+                visitDate: { $lt: new Date() },
+                isCompleted: false
+            }
+        };
 
         const pending = await Convert.find(filter);
         res.json(pending);

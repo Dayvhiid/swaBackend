@@ -17,12 +17,41 @@ router.get('/users', protect, authorize('super_admin', 'zonal_admin', 'area_admi
         } else if (req.user.role === 'area_admin') {
             filter = { areaId: req.user.areaId };
         } else if (req.user.role === 'parish_admin') {
-            filter = { parishId: req.user.parishId };
+            // Parish admins can ONLY see soul winners in their parish
+            filter = { parishId: req.user.parishId, role: 'soul_winner' };
         }
         // super_admin keeps filter = {}
 
         const users = await User.find(filter).select('-passwordHash');
         res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @desc    Get pending soul winners (unvalidated soul_winner users) based on admin's scope
+// @route   GET /api/admin/pending-soul-winners
+// @access  Private/Admin Roles
+router.get('/pending-soul-winners', protect, authorize('super_admin', 'zonal_admin', 'area_admin', 'parish_admin'), async (req, res) => {
+    try {
+        let filter = { role: 'soul_winner', isValidated: false };
+
+        // Apply scope based on role
+        if (req.user.role === 'zonal_admin') {
+            filter.zonalId = req.user.zonalId;
+        } else if (req.user.role === 'area_admin') {
+            filter.areaId = req.user.areaId;
+        } else if (req.user.role === 'parish_admin') {
+            filter.parishId = req.user.parishId;
+        }
+        // super_admin keeps filter as-is (gets all unvalidated soul_winners)
+
+        const pendingSoulWinners = await User.find(filter).select('_id name email parishId areaId zonalId createdAt');
+        res.json({
+            success: true,
+            count: pendingSoulWinners.length,
+            data: pendingSoulWinners
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

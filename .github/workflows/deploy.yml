@@ -18,14 +18,24 @@ jobs:
 
       - run: npm test
 
-      - name: Deploy to server
+      - name: SCP source to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "."
+          target: "${{ secrets.SWA_PATH }}/swaBackend"
+          strip_components: 0
+          rm: true
+
+      - name: Rebuild & restart backend
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            cd ${{ secrets.BACKEND_PATH }}
-            git pull origin production
-            npm ci --omit=dev
-            pm2 restart swa-backend || pm2 start src/index.js --name swa-backend
+            cd ${{ secrets.SWA_PATH }}
+            docker compose build backend
+            docker compose up -d backend

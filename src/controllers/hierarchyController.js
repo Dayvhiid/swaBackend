@@ -129,9 +129,69 @@ const getAreaDetails = async (req, res) => {
     }
 };
 
+/**
+ * Admin endpoint: Create a new Parish under an existing Area (super_admin only).
+ */
+const createParish = async (req, res) => {
+    try {
+        const { name, areaId, description } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Parish name is required.'
+            });
+        }
+
+        if (!areaId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Area is required.'
+            });
+        }
+
+        const area = await Area.findById(areaId);
+        if (!area) {
+            return res.status(404).json({
+                success: false,
+                message: 'Area not found.'
+            });
+        }
+
+        const existing = await Parish.findOne({
+            name: { $regex: `^${name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+            areaId: area._id.toString()
+        });
+        if (existing) {
+            return res.status(409).json({
+                success: false,
+                message: 'A parish with this name already exists in this area.'
+            });
+        }
+
+        const parish = await Parish.create({
+            name: name.trim(),
+            areaId: area._id.toString(),
+            ...(description && { description: description.trim() })
+        });
+
+        res.status(201).json({
+            success: true,
+            data: parish
+        });
+    } catch (error) {
+        console.error('Error creating parish:', error);
+        res.status(500).json({
+            success: false,
+            message: 'An error occurred while creating the parish.'
+        });
+    }
+};
+
 module.exports = {
     getHierarchyTree,
     getAreasList,
     getAreaStats,
-    getAreaDetails
+    getAreaDetails,
+    createParish
 };
